@@ -1,0 +1,16 @@
+.htaccess
+.DS_Store
+
+.git/
+.idea/
+.vscode/
+!index.html
+.xdebug_log/
+.buildpath
+.project
+.settings/
+.metadata/
+
+chkcode/*
+node_modules/*
+qqs.js
