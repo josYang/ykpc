@@ -1,5 +1,6 @@
 const cheerio   = require('cheerio');
 const superagent = require('superagent').agent();
+const fs        = require('fs');
 const tesseract = require('node-tesseract');
 const gm        = require('gm');
 
@@ -20,26 +21,26 @@ module.exports = {
     getJavascriptCookie: function (signCookie) {
         return new Promise((resolve, reject) => {
             superagent.get(config.url).set("Cookie", signCookie).set(config.browserMsg).end((err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    var $ = cheerio.load(res.text);
-                    const script = $('script[type="text/javascript"]').html();
+                if (err) return reject(err);
+
+                var $ = cheerio.load(res.text);
+                const script = $('script[type="text/javascript"]').html();
+    
+                const start = script.indexOf('"');
+    
+                const end = script.indexOf(',') - 1;
+    
+                const value = script.substr(start, end);
+
+                if (value.length < 1) return reject(new Error('获取javascriptcookie失败'));
+    
+                var exdate = new Date();
         
-                    const start = script.indexOf('"');
-        
-                    const end = script.indexOf(',') - 1;
-        
-                    const value = script.substr(start, end);
-        
-                    var exdate = new Date();
-            
-                    exdate.setDate(exdate.getDate() + 365);
-        
-                    resolve(signCookie.concat(
-                        [ 'waf_sign_javascript=' + escape(value) + "; path=/; expires=" + exdate.toGMTString() ]
-                    ));
-                }
+                exdate.setDate(exdate.getDate() + 365);
+    
+                resolve(signCookie.concat(
+                    [ 'waf_sign_javascript=' + escape(value) + "; path=/; expires=" + exdate.toGMTString() ]
+                ));
             });
         });
     },
@@ -47,12 +48,10 @@ module.exports = {
         return new Promise((resolve, reject) => {
             //传入cookie
             superagent.get(config.url).set("Cookie", cookie).set(config.browserMsg).end((err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    cookie.push(superagent.get(config.url).cookies.split(';')[1]);
-                    resolve(cookie);
-                }
+                if (err) return reject(err);
+
+                cookie.push(superagent.get(config.url).cookies.split(';')[1]);
+                resolve(cookie);
             });
         });
     },
@@ -69,10 +68,7 @@ module.exports = {
     
             req.pipe(fs.createWriteStream(img)).on('finish', () => {
                 imgdecode(img).then(text => {
-                    resolve({
-                        cookie: cookie,
-                        chkcode: text
-                    });
+                    resolve(text);
                 });
             });
         });
@@ -85,14 +81,12 @@ module.exports = {
             superagent.post(data_url).set("Cookie", cookie).send({
                 chkcode: chkcode
             }).set(config.browserMsg).end((err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({
-                        cookie: cookie,
-                        doc: cheerio.load(res.text)
-                    });
-                }
+                if (err) return reject(err);
+                const $ = cheerio.load(res.text);
+
+                if ($('#cont_tow_1 img[src="/chkcode"]').length > 0) return reject(new Error('验证码输入错误，获取卡密列表页面失败'));
+
+                resolve($);
             });
         });
     },
@@ -102,11 +96,13 @@ module.exports = {
             const dataurl = `${config.servername}/checkgoods?rec=0&t=${time}&orderid=${order_id}`;
     
             superagent.get(dataurl).set("Cookie", cookie).set(config.browserMsg).end((err, res) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(JSON.parse(res.text));
-                }
+                if (err) return reject(err);
+                
+                const cardinfo = JSON.parse(res.text);
+                
+                if (cardinfo.status != 1) return reject(new Error(`查询卡密失败，${cardinfo.msg}`));
+
+                resolve(cardinfo);
             });
         });
     }

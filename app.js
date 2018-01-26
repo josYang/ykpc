@@ -1,36 +1,42 @@
 const fs    = require('fs');
+const cheerio    = require('cheerio');
 
-const qqs   = require('./qqs');
 const youka = require('./youka');
+var arguments = process.argv.splice(2);
+var qq;
+
+arguments.forEach((val, index, array) => {
+    if (val == '-qq') {
+        qq = arguments[index + 1];
+        return false;
+    }
+});
+
+if (typeof qq == 'undefined') console.log(new Error('请在命令后面添加-qq参数 例如 node app.js -qq 123456'));
 
 youka.getSignCookie()
     .then(youka.getJavascriptCookie)
     .then(youka.getSessionid)
     .then(cookies => {
-        qqs.map(qq => {
-            youka.getChkcode(cookies, qq)
-                .then(obj => {
-                    return youka.getList(obj.cookie, obj.chkcode, qq);
-                })
-                .then(obj => {
-                    // const $ = obj.doc;
-                    const $;
-                    fs.readFile('./list.html', function (error, data) {
-                        $ = cheerio.load(data.toString());
+        youka.getChkcode(cookies, qq)
+            .then(chkcode => {
+                return youka.getList(cookies, chkcode, qq);
+            })
+            .then($ => {
+                $('.order_tb a').each((index, element) => {
+                    const href = element.attribs.href;
+                    const orderid = href.substr(href.indexOf('=') + 1);
 
-                        $('.order_tb a').each((index, element) => {
-                            const href = element.attribs.href;
-                            const orderid = href.substr(href.indexOf('=') + 1);
-                
-                            youka.getData(orderid, obj.cookie).then(cardinfo => {
-                                //卡密信息
-                                console.log(cardinfo);
-                            });
-                
-                            return false;
-                        });
+                    youka.getData(orderid, cookies).then(cardinfo => {
+                        //卡密信息
+                        console.log(cardinfo);
+                    })
+                    .catch(err => {
+                        console.log(err);
                     });
                 });
-            return qq;
-        });
+            })
+            .catch(err => {
+                console.log(err);
+            });
     });
