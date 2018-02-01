@@ -1,29 +1,50 @@
-const cheerio   = require('cheerio');
+const fs         = require('fs');
 const superagent = require('superagent').agent();
-const fs        = require('fs');
-const tesseract = require('node-tesseract');
-const gm        = require('gm');
+const cheerio    = require('cheerio');
+const scanf      = require('scanf');
 
 const imgdecode  = require('./img-decode');
-const config = require ('./config');
 
-module.exports = {
-    getSignCookie: function () {
+class youka {
+    constructor (config) {
+        this.config = Object.assign({
+            servername: 'http://www.youka.la',
+            url: 'http://www.youka.la/orderquery',
+            browserMsg: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        }, config || {});
+    }
+    directGetSessionid (qq) {
+        const data_url = `${this.config.url}?st=contact&kw=${qq}`;
         return new Promise((resolve, reject) => {
-            superagent.get(config.url).set(config.browserMsg).redirects(0).end((err, res) => {
+            superagent.get(data_url).set(this.config.browserMsg).redirects(0).end((err, res) => {
+                if (err) return reject(err);
                 //获取cookie
                 let cookie = res.headers["set-cookie"];
     
                 resolve(cookie);
             });
         });
-    },
-    getJavascriptCookie: function (signCookie) {
+    }
+    getSignCookie () {
         return new Promise((resolve, reject) => {
-            superagent.get(config.url).set("Cookie", signCookie).set(config.browserMsg).end((err, res) => {
+            superagent.get(this.config.url).set(this.config.browserMsg).redirects(0).end((err, res) => {
+                //获取cookie
+                console.log(err, res);
+                let cookie = res.headers["set-cookie"];
+    
+                resolve(cookie);
+            });
+        });
+    }
+    getJavascriptCookie (signCookie) {
+        return new Promise((resolve, reject) => {
+            superagent.get(this.config.url).set("Cookie", signCookie).set(this.config.browserMsg).end((err, res) => {
                 if (err) return reject(err);
 
-                var $ = cheerio.load(res.text);
+                let $ = cheerio.load(res.text);
                 const script = $('script[type="text/javascript"]').html();
     
                 const start = script.indexOf('"');
@@ -34,7 +55,7 @@ module.exports = {
 
                 if (value.length < 1) return reject(new Error('获取javascriptcookie失败'));
     
-                var exdate = new Date();
+                let exdate = new Date();
         
                 exdate.setDate(exdate.getDate() + 365);
     
@@ -43,59 +64,84 @@ module.exports = {
                 ));
             });
         });
-    },
-    getSessionid: function (cookie) {
+    }
+    getSessionid (cookie) {
         return new Promise((resolve, reject) => {
             //传入cookie
-            superagent.get(config.url).set("Cookie", cookie).set(config.browserMsg).end((err, res) => {
+            superagent.get(this.config.url).set("Cookie", cookie).set(this.config.browserMsg).end((err, res) => {
                 if (err) return reject(err);
 
-                cookie.push(superagent.get(config.url).cookies.split(';')[1]);
+                cookie.push(superagent.get(this.config.url).cookies.split(';')[1]);
                 resolve(cookie);
             });
         });
-    },
-    getChkcode: function (cookie, qq) {
+    }
+    getCookiess (qq) {
+        return this.directGetSessionid(qq)
+            .then(cookies => {
+                return cookies;
+            })
+            .catch(err => {
+                return this.getSignCookie()
+                    .then(this.getJavascriptCookie)
+                    .then(this.getSessionid)
+            });
+    }
+    getChkcode (cookies, useimgdecode) {
         return new Promise((resolve, reject) => {
-            const imgurl = `${config.servername}/chkcode`;
+            const imgurl = `${this.config.servername}/chkcode`;
             const img = __dirname + '/chkcode/' + (Math.round(Math.random() * 1000)) + (new Date()).getTime() + '.jpg';
     
             //传入cookie
-            let req = superagent.get(imgurl).set("Cookie", cookie).set({
+            let req = superagent.get(imgurl).set("Cookie", cookies).set({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
                 'Content-Type': 'image/jpeg'
             });
     
             req.pipe(fs.createWriteStream(img)).on('finish', () => {
-                imgdecode(img).then(text => {
-                    resolve(text);
-                });
+                if (useimgdecode) {
+                    imgdecode(img).then(text => {
+                        resolve({
+                            cookies: cookies,
+                            chkcode: text
+                        });
+                    });
+                } else {
+                    console.log(`验证码地址：${img},请输入图内验证码，输入完成后按回车键！`);
+                    resolve({
+                        cookies: cookies,
+                        chkcode: scanf('%s')
+                    });
+                }
             });
         });
-    },
-    getList: function (cookie, chkcode, qq) {
+    }
+    getList (cookies, chkcode, qq) {
         return new Promise((resolve, reject) => {
-            const data_url = `${config.url}?st=contact&kw=${qq}`;
+            const data_url = `${this.config.url}?st=contact&kw=${qq}`;
     
             //传入cookie
-            superagent.post(data_url).set("Cookie", cookie).send({
+            superagent.post(data_url).set("Cookie", cookies).send({
                 chkcode: chkcode
-            }).set(config.browserMsg).end((err, res) => {
+            }).set(this.config.browserMsg).end((err, res) => {
                 if (err) return reject(err);
                 const $ = cheerio.load(res.text);
 
                 if ($('#cont_tow_1 img[src="/chkcode"]').length > 0) return reject(new Error('验证码输入错误，获取卡密列表页面失败'));
 
-                resolve($);
+                resolve({
+                    cookies: cookies,
+                    $: $
+                });
             });
         });
-    },
-    getData: function (order_id, cookie) {
+    }
+    getData (orderid, cookies) {
         return new Promise((resolve, reject) => {
             const time = new Date().getTime();
-            const dataurl = `${config.servername}/checkgoods?rec=0&t=${time}&orderid=${order_id}`;
+            const dataurl = `${this.config.servername}/checkgoods?rec=0&t=${time}&orderid=${orderid}`;
     
-            superagent.get(dataurl).set("Cookie", cookie).set(config.browserMsg).end((err, res) => {
+            superagent.get(dataurl).set("Cookie", cookies).set(this.config.browserMsg).end((err, res) => {
                 if (err) return reject(err);
                 
                 const cardinfo = JSON.parse(res.text);
@@ -107,3 +153,5 @@ module.exports = {
         });
     }
 }
+
+module.exports = exports = youka;

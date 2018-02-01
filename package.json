@@ -12,15 +12,10 @@
   "author": "jos",
   "license": "ISC",
   "dependencies": {
-    "balanced-match": "^1.0.0",
     "cheerio": "^1.0.0-rc.2",
-    "concat-map": "^0.0.1",
-    "gm": "^1.23.1",
-    "ms": "^2.1.1",
-    "node-tesseract": "^0.2.7",
-    "node-uuid": "^1.4.8",
-    "pseudomap": "^1.0.2",
+    "scanf": "^1.0.0",
     "superagent": "^3.8.2",
-    "yallist": "^3.0.2"
+    "gm": "^1.23.1",
+    "node-tesseract": "^0.2.7"
   }
 }
