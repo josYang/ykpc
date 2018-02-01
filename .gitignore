@@ -12,5 +12,6 @@
 .metadata/
 
 chkcode/*
+cardinfo/*
 node_modules/*
 qq.text

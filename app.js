@@ -39,16 +39,14 @@ pfs.readFile('./qq.txt')
                                     }, err => {
                                         console.log(err);
                                     })
-                            })
-                            .catch(err => {
-                                //卡密获取失败
-                                // console.log(err);
+                            }, err => {
+                                console.log(`订单${orderid}查询失败，失败原因：${err}`);
                             });
                     });
                 })
                 .catch(err => {
                     //验证码输入错误
-                    console.log(qq, err);
+                    console.log(`${qq}获取列表失败，失败原因：${err}`);
                 });
             return qq;
         });
