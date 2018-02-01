@@ -1,6 +1,5 @@
-const fs    = require('fs');
-
 const youka = new (require('./youka'))();
+const pfs   = require('./pfs');
 
 // var arguments = process.argv.splice(2);
 // var qq;
@@ -14,20 +13,15 @@ const youka = new (require('./youka'))();
 
 // if (typeof qq == 'undefined') console.log(new Error('请在命令后面添加-qq参数 例如 node app.js -qq 123456'));
 
-function readFile(file) {
-    return new Promise((resolve, reject) => {
-        fs.readFile(file, (err, data) => {
-            if (err) return reject(err);
-            resolve(data.toString());
-        });
-    });
-}
+const file = __dirname + '/cardinfo/' + (new Date()).getTime() + (Math.round(Math.random() * 1000)) + '.txt';
 
-readFile('./qq.text')
+pfs.readFile('./qq.txt')
     .then(text => {
         text.split('\n').map(qq => {
             youka.getCookiess(qq)
-                .then(youka.getChkcode)
+                .then(cookies => {
+                    return youka.getChkcode(cookies, false);
+                })
                 .then(obj => {
                     return youka.getList(obj.cookies, obj.chkcode, qq);
                 })
@@ -39,17 +33,23 @@ readFile('./qq.text')
 
                         youka.getData(orderid, obj.cookies)
                             .then(cardinfo => {
-                                console.log('卡密信息：\n', cardinfo);
+                                pfs.writeFile(file, JSON.stringify(cardinfo) + '\t\n\n')
+                                    .then(file => {
+                                        console.log(`订单${orderid}内卡密写入文件${file}成功`);
+                                    }, err => {
+                                        console.log(err);
+                                    })
                             })
                             .catch(err => {
-                                console.log(err);
+                                //卡密获取失败
+                                // console.log(err);
                             });
                     });
                 })
                 .catch(err => {
-                    console.log(err);
+                    //验证码输入错误
+                    console.log(qq, err);
                 });
             return qq;
         });
     });
-

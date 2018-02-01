@@ -4,6 +4,7 @@ const cheerio    = require('cheerio');
 const scanf      = require('scanf');
 
 const imgdecode  = require('./img-decode');
+const pfs        = require('./pfs');
 
 class youka {
     constructor (config) {
@@ -32,7 +33,6 @@ class youka {
         return new Promise((resolve, reject) => {
             superagent.get(this.config.url).set(this.config.browserMsg).redirects(0).end((err, res) => {
                 //获取cookie
-                console.log(err, res);
                 let cookie = res.headers["set-cookie"];
     
                 resolve(cookie);
@@ -53,7 +53,7 @@ class youka {
     
                 const value = script.substr(start, end);
 
-                if (value.length < 1) return reject(new Error('获取javascriptcookie失败'));
+                if (value.length < 1) return reject('获取javascriptcookie失败');
     
                 let exdate = new Date();
         
@@ -85,13 +85,16 @@ class youka {
                 return this.getSignCookie()
                     .then(this.getJavascriptCookie)
                     .then(this.getSessionid)
+                    .catch(err => {
+                        return err;
+                    });
             });
     }
     getChkcode (cookies, useimgdecode) {
         return new Promise((resolve, reject) => {
             const imgurl = `${this.config.servername}/chkcode`;
-            const img = __dirname + '/chkcode/' + (Math.round(Math.random() * 1000)) + (new Date()).getTime() + '.jpg';
-    
+            const img = __dirname + '/chkcode/' + (new Date()).getTime() + (Math.round(Math.random() * 1000)) + '.jpg';
+
             //传入cookie
             let req = superagent.get(imgurl).set("Cookie", cookies).set({
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.84 Safari/537.36',
@@ -113,6 +116,10 @@ class youka {
                         chkcode: scanf('%s')
                     });
                 }
+                pfs.unlink(img)
+                    .then(file => {
+                        console.log(`验证码图片${img}已删除`);
+                    });
             });
         });
     }
@@ -127,7 +134,7 @@ class youka {
                 if (err) return reject(err);
                 const $ = cheerio.load(res.text);
 
-                if ($('#cont_tow_1 img[src="/chkcode"]').length > 0) return reject(new Error('验证码输入错误，获取卡密列表页面失败'));
+                if ($('#cont_tow_1 img[src="/chkcode"]').length > 0) return reject('验证码输入错误，获取卡密列表页面失败');
 
                 resolve({
                     cookies: cookies,
@@ -146,7 +153,7 @@ class youka {
                 
                 const cardinfo = JSON.parse(res.text);
                 
-                if (cardinfo.status != 1) return reject(new Error(`查询卡密失败，${cardinfo.msg}`));
+                if (cardinfo.status != 1) return reject(`查询卡密失败，${cardinfo.msg}`);
 
                 resolve(cardinfo);
             });

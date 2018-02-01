@@ -1,6 +1,7 @@
-const fs        = require('fs');
 const tesseract = require('node-tesseract');
 const gm        = require('gm');
+
+const pfs       = require('./pfs');
 
 /**
  * 处理图片为阈值图片
@@ -52,4 +53,9 @@ module.exports = img => {
 
     return processImg(img, newimg, '77%')
     .then(recognizer);
+
+    pfs.unlink(newimg)
+        .then(img => {
+            console.log(`验证码图片${img}已删除`);
+        });
 }
