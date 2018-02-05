@@ -39,22 +39,28 @@ function getData (qqs1, qqs2) {
     })
     .then(obj => {
         qqs2.push(qq);
+
         let $ = obj.$;
-        if ($('.order_tb a').length <= 0) console.log(`qq${qq}内没有订单\t\n`);
+
+        if ($('.order_tb a').length <= 0) console.log(`qq${qq}内没有订单`);
+
         $('.order_tb a').each((index, element) => {
             const href = element.attribs.href;
             const orderid = href.substr(href.indexOf('=') + 1);
 
             youka.getData(orderid, obj.cookies)
                 .then(cardinfo => {
-                    pfs.writeFile(file, JSON.stringify(cardinfo) + '\t\n\n')
-                        .then(file => {
-                            console.log(`订单${orderid}内卡密写入文件${file}成功\t\n`);
-                        }, err => {
-                            console.log('文件写入失败', err, '\t\n');
-                        })
-                }, err => {
-                    console.log(`订单${orderid}查询失败，失败原因：${err}\t\n`);
+                    return youka.getOrdertime(orderid, obj.cookies, cardinfo);
+                })
+                .then(data => {
+                    let str = `${orderid},${data.ordertime},${JSON.stringify(data.cardinfo)}\t\n`;
+                    return pfs.writeFile(file, str);
+                })
+                .then(file => {
+                    console.log(`订单${orderid}内容写入文件${file}成功`);
+                })
+                .catch(err => {
+                    console.error('获取订单失败，错误信息：', err);
                 });
         });
 
@@ -63,6 +69,6 @@ function getData (qqs1, qqs2) {
     .catch(err => {
         getData(qqs1, qqs2);
         //验证码输入错误
-        console.log(`qq${qq}获取列表失败，失败原因：${err}\t\n`);
+        console.log(`qq${qq}获取列表失败，失败原因：`, err);
     });
 }
